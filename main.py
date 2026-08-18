@@ -20,12 +20,11 @@ Loggdatei = DataLog("Aktuelle Zeit", "AktuelleFarbe", "Anzahl Rot", "Anzahl Grü
         
 # Write your program here.
 class Farbsortierer:
-    def __init__(self, Auswurfs_Motor, Foerderband_Motor, Farb_Sensor, Beruehrungs_Sensor, Ultraschall_Sensor):
+    def __init__(self, Auswurfs_Motor, Foerderband_Motor, Farb_Sensor, Beruehrungs_Sensor):
         self.Auswurfs_Motor = Auswurfs_Motor
         self.Foerderband_Motor = Foerderband_Motor
         self.Farb_Sensor = Farb_Sensor
         self.Beruehrungs_Sensor = Beruehrungs_Sensor
-        self.Ultraschall_Sensor = Ultraschall_Sensor
         self.None_Zaehler = 0
         self.Rot_Zaehler = 0
         self.Gruen_Zaehler = 0
@@ -34,10 +33,10 @@ class Farbsortierer:
         self.Letzte_Farbe = Color.BLACK
         self.Zuerueckliegende_Farbe = Color.BLACK
         self.Sperre_Kein_Baustein = False
-        self.Erster_Gemessener_Wert_In_MM = 0
-        self.Aktueller_Wert_In_MM = 0
-        self.Wert_Ein_Viertel_Auswurf = 0
-        self.Wert_Drei_Viertel_Auswurf = 0
+        self.War_Gedrueckt = False
+        self.Jetzt_Gedrueckt = False
+        self.Wert_Ein_Viertel_Auswurf = 105
+        self.Wert_Drei_Viertel_Auswurf = 505
         
     def Farberkennung(self):
         print("Farberkennung gestartet")
@@ -52,28 +51,24 @@ class Farbsortierer:
     def Farbverarbeitung(self):
         self.Farberkennung()
         if self.Letzte_Farbe == Color.RED:
-            #Motor bewegt sich in den 3/4
             print("Rot erkannt")
             ev3.screen.clear()
-            ev3.screen.draw_text(0, 64, "Rot erkannt") # Noch einmitteln mit folgender formelx = (screen.width - text_width) // 2)
+            ev3.screen.draw_text(0, 64, "Rot erkannt")
             self.Ton_Wiedergabe("Rot erkannt")
         elif self.Letzte_Farbe == Color.GREEN:
-            #Motor bewegt sich in den 1/4
             print("Grün erkannt")
             ev3.screen.clear()
-            ev3.screen.draw_text(0, 64, "Grün erkannt")# Noch einmitteln mit folgender formelx = (screen.width - text_width) // 2)
+            ev3.screen.draw_text(0, 64, "Grün erkannt")
             self.Ton_Wiedergabe("Grün erkannt")
         elif self.Letzte_Farbe == Color.BLUE:
-            #Motor bewegt sich in den 1/4
             print("Blau erkannt")
             ev3.screen.clear()
-            ev3.screen.draw_text(0, 64, "Blau erkannt")# Noch einmitteln mit folgender formelx = (screen.width - text_width) // 2)
+            ev3.screen.draw_text(0, 64, "Blau erkannt")
             self.Ton_Wiedergabe("Blau erkannt")
         elif self.Letzte_Farbe == Color.YELLOW:
-            #Motor bewegt sich in den 1/4
             print("Gelb erkannt")
             ev3.screen.clear()
-            ev3.screen.draw_text(0, 64, "Gelb erkannt")# Noch einmitteln mit folgender formelx = (screen.width - text_width) // 2)
+            ev3.screen.draw_text(0, 64, "Gelb erkannt")
             self.Ton_Wiedergabe("Gelb erkannt")
         elif self.Letzte_Farbe == Color.BLACK:
             print("Kein Auswurfobjekt erkannt")
@@ -82,12 +77,13 @@ class Farbsortierer:
                 print("Kein Auswurfobjekt erkannt, wird wiedergegeben")
                 ev3.screen.clear()
                 self.None_Zaehler = 0
-                ev3.screen.draw_text(0, 64, "Kein Auswurfobjekt erkannt") # Noch einmitteln mit folgender formelx = (screen.width - text_width) // 2)
+                ev3.screen.draw_text(0, 64, "Kein Auswurfobjekt erkannt")
                 self.Ton_Wiedergabe("Kein Auswurfobjekt erkannt")
                 self.Sperre_Kein_Baustein = True
                 
                 
     def Farb_Zaehler(self):
+        print("Farbe gezählt")
         if self.Letzte_Farbe == Color.RED:
             self.Rot_Zaehler += 1
         elif self.Letzte_Farbe == Color.GREEN:
@@ -100,7 +96,7 @@ class Farbsortierer:
     #Die Ton_Wiedergabe gibt den übergebenen Text in der Sprache Deutsch wieder.
     def Ton_Wiedergabe(self, Wiedergabetext):
         ev3.speaker.set_volume(100)
-        ev3.speaker.set_speech_options(language='de', voice='M3')#Sprache und Wiedergabe anpassen
+        ev3.speaker.set_speech_options(language='de', voice='M3')
         ev3.speaker.say(Wiedergabetext)
         
     # Ausgabe_Bauteilanzahl gibt die Anzahl der erkannten Bauteile jeder Farbe auf dem Display aus.
@@ -117,57 +113,62 @@ class Farbsortierer:
     def Ein_Viertel_Auswurf(self):
         print("Auswurfarm fährt in die 1/4 Position")
         if self.Letzte_Farbe == Color.GREEN or self.Letzte_Farbe == Color.BLUE or self.Letzte_Farbe == Color.YELLOW:
-            self.Wert_Ein_Viertel_Auswurf = (self.Erster_Gemessener_Wert_In_MM/4)
-            self.Foerderband_Motor.run(100)
-            while self.Aktueller_Wert_In_MM <= self.Wert_Ein_Viertel_Auswurf:
-                self.Aktueller_Wert_In_MM = self.Ultraschall_Sensor.distance()
-                wait(20)   
+            self.Foerderband_Motor.reset_angle(0)   # Nullpunkt = aktuelle Home-Position
+            while self.Foerderband_Motor.angle() <= self.Wert_Ein_Viertel_Auswurf:
+                self.Foerderband_Motor.run(100)
+                print("Winkel:", self.Foerderband_Motor.angle(), "/ Ziel:", self.Wert_Ein_Viertel_Auswurf)
+                wait(20)
             self.Foerderband_Motor.hold()
-            self.Auswurfs_Motor.run_angle(100, 360, Stop.HOLD, True) #geschwindigkeit noch anpassen
+            print("Auswurf Baustein")
+            self.Auswurfs_Motor.run_angle(160, -180)#hoch
+            print("Auswurfsmechanismus in die Ausgangslage")
+            self.Auswurfs_Motor.run_angle(160, 180)#runter
             
             
     #Die Auswurfmethode sobald die Farbe Rot erkannt wird.
     def Drei_Viertel_Auswurf(self):
         print("Auswurfarm fährt in die 3/4 Position")
         if self.Letzte_Farbe == Color.RED:
-            self.Wert_Drei_Viertel_Auswurf = ((self.Erster_Gemessener_Wert_In_MM/4)*3)
-            self.Foerderband_Motor.run(100) 
-            while self.Aktueller_Wert_In_MM <= self.Wert_Drei_Viertel_Auswurf:
-                self.Foerderband_Motor.run(100)  
-                self.Aktueller_Wert_In_MM = self.Ultraschall_Sensor.distance()
-                wait(20) 
+            self.Foerderband_Motor.reset_angle(0)   
+            while self.Foerderband_Motor.angle() <= self.Wert_Drei_Viertel_Auswurf:
+                self.Foerderband_Motor.run(150)
+                print("Winkel:", self.Foerderband_Motor.angle(), "/ Ziel:", self.Wert_Drei_Viertel_Auswurf)
+                wait(20)
             self.Foerderband_Motor.hold()
-            self.Auswurfs_Motor.run_angle(100, 360, Stop.HOLD, True) #geschwindigkeit noch anpassen
+            print("Auswurf Baustein")
+            self.Auswurfs_Motor.run_angle(160, -180)#hoch
+            print("Auswurfsmechanismus in die Ausgangslage")
+            self.Auswurfs_Motor.run_angle(160, 180)#runter
             
     
     #Auswurfsarm fährt in Ausgangsposition zurück.
     def Ausgangspunkt_Auswurfsarm(self):
         print("Auswurfsarm fährt in Ausgangsposition zurück")
-        if self.Beruehrungs_Sensor.pressed():
-            self.Foerderband_Motor.brake()
-            print("Auswurfsarm in Ausgangsposition angekommen")
-            self.Zuerueckliegende_Farbe = self.Letzte_Farbe
-        else:
-            self.Foerderband_Motor.run(-100)#geschwindigkeit noch anpassen
-            print("Auswurfsarm fährt in Ausgangsposition zurück")
+        while not self.Beruehrungs_Sensor.pressed():
+            self.Foerderband_Motor.run(-100)
+        self.Foerderband_Motor.brake()    
+        print("Auswurfsarm in Ausgangsposition angekommen")
 
     #Verbindung von der Bewegung, erkennung und verarbeitung der farbe
     def Foerderband(self):
         if self.Beruehrungs_Sensor.pressed():
             self.Farbverarbeitung()
-            if self.Beruehrungs_Sensor.pressed() and self.Letzte_Farbe == Color.BLACK:
+            self.Jetzt_Gedrueckt = self.Beruehrungs_Sensor.pressed()
+            print(self.Jetzt_Gedrueckt)
+            print(self.War_Gedrueckt)
+            if self.Jetzt_Gedrueckt == True and self.War_Gedrueckt == False and self.Letzte_Farbe == Color.BLACK:
                 print("Foerderband wartet auf neuen Baustein")
+                self.War_Gedrueckt = self.Jetzt_Gedrueckt
             elif (self.Beruehrungs_Sensor.pressed() and (self.Letzte_Farbe == Color.GREEN or self.Letzte_Farbe == Color.BLUE or self.Letzte_Farbe == Color.YELLOW)):
                 print("Foerderband fährt in die Stellung für den 1/4 Auswurf")
-                self.Erster_Gemessener_Wert_In_MM = self.Ultraschall_Sensor.distance()
                 self.Sperre_Kein_Baustein = False
                 self.None_Zaehler = 0
                 self.Ein_Viertel_Auswurf()
                 self.Farb_Zaehler()
                 self.Ausgabe_Bauteilanzahl()
                 self.Ausgangspunkt_Auswurfsarm()
-            elif self.Beruehrungs_Sensor.pressed() and self.Letzte_Farbe == Color.RED:
-                self.Erster_Gemessener_Wert_In_MM = self.Ultraschall_Sensor.distance()
+                self.War_Gedrueckt = self.Jetzt_Gedrueckt
+            elif self.Jetzt_Gedrueckt == True and self.War_Gedrueckt == False and self.Letzte_Farbe == Color.RED:
                 self.Sperre_Kein_Baustein = False
                 self.None_Zaehler = 0
                 print("Foerderband fährt in die Stellung für den 3/4 Auswurf")
@@ -175,16 +176,17 @@ class Farbsortierer:
                 self.Farb_Zaehler()
                 self.Ausgabe_Bauteilanzahl()
                 self.Ausgangspunkt_Auswurfsarm()
+                self.War_Gedrueckt = self.Jetzt_Gedrueckt
             
     def DataLog(self):
-        if (self.Letzte_Farbe != self.Zuerueckliegende_Farbe) and (self.Letzte_Farbe != Color.BLACK or self.Zuerueckliegende_Farbe == Color.BLACK   ):
+        if (self.Letzte_Farbe != self.Zuerueckliegende_Farbe) and (self.Letzte_Farbe != Color.BLACK or self.Zuerueckliegende_Farbe == Color.BLACK):
             Loggdatei.log(Aktuelle_Zeit.time(), self.Letzte_Farbe, self.Rot_Zaehler, self.Gruen_Zaehler, self.Blau_Zaehler, self.Gelb_Zaehler)
+            self.Zuerueckliegende_Farbe = self.Letzte_Farbe                
         
-        
-Farbsortierer1 = Farbsortierer(Motor(Port.B),Motor(Port.A),ColorSensor(Port.S2),TouchSensor(Port.S1),UltrasonicSensor(Port.S4))
+Farbsortierer1 = Farbsortierer(Motor(Port.B), Motor(Port.A), ColorSensor(Port.S2), TouchSensor(Port.S1))
 
 while True:
+
     Farbsortierer1.Foerderband()
     Farbsortierer1.DataLog()
-    wait(200)
-             
+    wait(200)          
